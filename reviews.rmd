@@ -1,0 +1,77 @@
+---
+title: "Movie Reviews"
+author: "Ryan Weber"
+date: "February 11, 2018"
+output: 
+  html_document:
+    toc: true
+    theme: united
+    highlight: tango
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Database and files
+
+R Markdown, sql, and CSV files needed to create the database and this html document can be found here: https://github.com/rweberc/Data607_Assignment2
+
+# Gather data
+
+## Setup workspace
+
++ Load RMySQL
++ Create database connection
+
+```{r setup-workspace, message=FALSE, warning=FALSE}
+library(dplyr)
+library(RMySQL)
+library(ggplot2)
+password <- read.table("C:/Users/weberr1/Desktop/CUNY/DATA 607/Assignment/password.csv", stringsAsFactors = FALSE)
+mydb = dbConnect(MySQL(), user='rweberc', password=password$V1[1], dbname='reviews', host='localhost')
+
+```
+
+## Load data
+
+
+Load movie data:
+```{r load-movies}
+moviesDf <- dbGetQuery(mydb, "SELECT * FROM movies") %>% 
+  mutate(Director = gsub("\r", "", Director)) # remove return character
+moviesDf
+```
+
+
+Load critic data:
+```{r load-critics}
+criticsDf <- dbGetQuery(mydb, "SELECT * FROM critics") %>%
+  mutate(LastName = gsub("\r", "", LastName))
+criticsDf 
+```
+
+
+Load review data: 
+```{r load-reviews}
+reviewsDf <- dbGetQuery(mydb, "SELECT * FROM reviews")
+head(reviewsDf)
+```
+
+
+## Merge data
+```{r merge-data}
+mergeDf <- left_join(reviewsDf, criticsDf, by=c("CriticId"))
+mergeDf <- left_join(mergeDf, moviesDf, by=c("MovieId"))
+mergeDf <- mergeDf %>% select(Title, FirstName, LastName, Rating)
+```
+
+# Which film had the best rating?
+
+```{r plot data-frame, echo=FALSE}
+avgDf <- mergeDf %>% group_by(Title) %>% summarize(AverageRating = mean(Rating, na.rm=TRUE))
+ggplot(data=avgDf, aes(x=reorder(Title, AverageRating), y=AverageRating)) +
+  geom_bar(stat="identity") +
+  coord_flip() +
+  labs(x = "Movies", y = "Ratings")
+```
